@@ -4,7 +4,7 @@ Automatic Query Image Disambiguation (AID)
 This repository contains the reference implementation of AID and code that can be used
 to reproduce the results from the corresponding paper:
 
-> Björn Barz and Joachim Denzler.
+> Björn Barz and Joachim Denzler.  
 > "Automatic Query Image Disambiguation for Content-based Image Retrieval."
 
 If you use AID, please cite that paper.
@@ -15,16 +15,16 @@ Dependencies
 
 ##### Mandatory
 
-- Python >= 3.3
-- numpy
-- scipy
-- scikit-learn
+- `Python >= 3.3`
+- `numpy`
+- `scipy`
+- `scikit-learn`
 
 ##### Optional
 
-- caffe & pycaffe (required if you want to extract the image features yourself)
-- tqdm (for progress bars during feature extraction)
-- matplotlib (if you would like to generate graphs for Precision@k)
+- `caffe` & `pycaffe` (required if you want to extract the image features yourself)
+- `tqdm` (for progress bars during feature extraction)
+- `matplotlib` (if you would like to generate graphs for Precision@k)
 
 
 Reproducing the results from the paper
@@ -37,12 +37,11 @@ you need to compute some features for the images in the dataset. You can either 
 a [.npy file with pre-computed features][1] (49 MB) for the MIRFLICKR dataset or you can extract
 the features yourself as follows:
 
-1. Download the MIRFLICKR-25K dataset:
-   http://press.liacs.nl/mirflickr/mirflickr25k/mirflickr25k.zip (2.9 GB)
-2. Extract the downloaded file inside of the `mirflickr` directory of this directory, so that you
+1. Download the [MIRFLICKR-25K dataset][2] (2.9 GB).
+2. Extract the downloaded file inside of the `mirflickr` directory of this repository, so that you
    end up with another `mirflickr` directory inside of the top-level `mirflickr` directory.
-3. Download the pre-trained weights of the VGG 16 model and store them in the `model` directory:
-   http://www.robots.ox.ac.uk/%7Evgg/software/very_deep/caffe/VGG_ILSVRC_16_layers.caffemodel (528 MB)
+3. Download the [pre-trained weights of the VGG 16 model][3] (528 MB) and store them in the `model`
+   directory.
 4. From the root directory of the repository, run: `python extract_features.py`
 
 ### Running the benchmark
@@ -79,3 +78,5 @@ randomization.
 
 
 [1]: http://www.inf-cv.uni-jena.de/dbvmedia/de/Barz/AID/features.npy
+[2]: http://press.liacs.nl/mirflickr/mirflickr25k/mirflickr25k.zip
+[3]: http://www.robots.ox.ac.uk/%7Evgg/software/very_deep/caffe/VGG_ILSVRC_16_layers.caffemodel
