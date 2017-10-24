@@ -57,6 +57,7 @@ if __name__ == '__main__':
     parser_data = parser.add_argument_group('Data')
     parser_data.add_argument('--gt_dir', type = str, default = 'mirflickr', help = 'Directory with the ground-truth label files.')
     parser_data.add_argument('--query_dir', type = str, default = 'mirflickr', help = 'Directory with the query list files.')
+    parser_data.add_argument('--dup_file', type = str, default = 'mirflickr/duplicates.txt', help = 'File containing a list of IDs of duplicate images.')
     parser_data.add_argument('--feature_dump', type = str, default = 'features.npy', help = 'Path to a dump of the feature matrix of the dataset as created by extract_features.py.')
     parser_display = parser.add_argument_group('Results Format')
     parser_display.add_argument('--show_sd', action = 'store_const', const = True, default = False, help = 'Show table with standard deviation of performance metrics.')
@@ -90,7 +91,7 @@ if __name__ == '__main__':
                 algo_params[algo_name][arg_components[1]] = arg_value
     
     # Load features and queries
-    queries = get_dataset_queries(args.gt_dir, args.query_dir)
+    queries = get_dataset_queries(args.gt_dir, args.query_dir, args.dup_file)
     if len(queries) == 0:
         print('Could not find any queries. Have you set --query_dir correctly?')
         exit()
@@ -113,7 +114,7 @@ if __name__ == '__main__':
             metrics[method].append(eval_metrics.avg_query_metrics({ qid : {
                 'relevant' : query['relevant'],
                 'retrieved' : retrieved[qid][0],
-                'ignore' : set([query['img_id']])
+                'ignore' : set([query['img_id']]) | (query['ignore'] if 'ignore' in query else set())
             } for qid, query in queries.items() })[0])
             
             if args.plot_precision:
@@ -123,7 +124,7 @@ if __name__ == '__main__':
                         range(1, 101),
                         queries[qid]['relevant'],
                         ret,
-                        set([queries[qid]['img_id']])
+                        set([queries[qid]['img_id']]) | (queries[qid]['ignore'] if 'ignore' in queries[qid] else set())
                     ) for qid, (ret, dist) in retrieved.items()], axis = 0))
     
     import pickle
