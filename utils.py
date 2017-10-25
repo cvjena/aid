@@ -1,6 +1,23 @@
 import os.path
 from glob import glob
 
+try:
+    
+    from tqdm import tqdm
+    
+    def ptqdm(*args, **kwargs):
+        return tqdm(*args, **kwargs)
+    
+except ImportError:
+    
+    def tqdm(it, **kwargs):
+        return it
+    
+    def ptqdm(it, **kwargs):
+        for i, x in enumerate(it):
+            print('Round {}'.format(i+1))
+            yield x
+
 
 
 def get_dataset_images(img_dir):

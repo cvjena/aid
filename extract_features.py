@@ -4,13 +4,7 @@ import argparse
 
 from sklearn.decomposition import PCA
 
-from utils import get_dataset_images
-
-try:
-    from tqdm import tqdm
-except ImportError:
-    def tqdm(it, **kwargs):
-        return it
+from utils import get_dataset_images, tqdm
 
 
 

@@ -1,8 +1,9 @@
 import numpy as np
+from utils import tqdm
 
 
 
-def baseline_retrieval(features, queries, select_clusters):
+def baseline_retrieval(features, queries, select_clusters, show_progress = False):
     """ Baseline retrieval without disambiguation.
     
     features - n-by-d matrix containing d-dimensional features of n samples.
@@ -12,13 +13,16 @@ def baseline_retrieval(features, queries, select_clusters):
     
     select_clusters - Not used, only present for compatibility with similar functions.
     
+    show_progress - If True, a progress bar will be shown (requires tqdm).
+    
     Returns: Baseline retrieval results as dictionary mapping query IDs to tuples consisting of an ordered list of retrieved image
              IDs and a corresponding list of adjusted distances to the query.
     """
     
     # Build ranked list of retrieval results for each query
     retrievals = {}
-    for qid, query in queries.items():
+    query_it = tqdm(queries.items(), desc = 'Baseline', total = len(queries), leave = False) if show_progress else queries.items()
+    for qid, query in query_it:
         distances = np.sum((features - features[[query['img_id']],:]) ** 2, axis = 1)
         ranking = np.argsort(distances)
         assert(ranking[0] == query['img_id'])

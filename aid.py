@@ -6,6 +6,7 @@ from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.utils.graph import graph_laplacian
 
 from common import baseline_retrieval
+from utils import tqdm
 
 
 
@@ -16,7 +17,7 @@ EPS = np.finfo('float32').resolution
 ## AID ##
 
 
-def automatic_image_disambiguation(features, queries, select_clusters, gamma = 1.0, k = 200, n_clusters = None, max_clusters = 10):
+def automatic_image_disambiguation(features, queries, select_clusters, gamma = 1.0, k = 200, n_clusters = None, max_clusters = 10, show_progress = False):
     """ Automatic Image Disambiguation (our method) based on clustering of directions and directed boni.
     
     features - n-by-d matrix containing d-dimensional features of n samples.
@@ -38,6 +39,8 @@ def automatic_image_disambiguation(features, queries, select_clusters, gamma = 1
     
     max_clusters - Maximum number of clusters. Has only an effect if n_clusters is None.
     
+    show_progress - If True, a progress bar will be shown (requires tqdm).
+    
     Returns: re-ranked retrieval results as dictionary mapping query IDs to tuples consisting of an ordered list of retrieved image IDs
              and a corresponding list of adjusted distances to the query.
     """
@@ -45,7 +48,8 @@ def automatic_image_disambiguation(features, queries, select_clusters, gamma = 1
     # Baseline retrieval
     retrievals = baseline_retrieval(features, queries, select_clusters)
     
-    for qid, (ret, distances) in retrievals.items():
+    ret_it = tqdm(retrievals.items(), desc = 'AID', total = len(retrievals), leave = False) if show_progress else retrievals.items()
+    for qid, (ret, distances) in ret_it:
         
         query = queries[qid]
         query_feat = features[query['img_id']]
@@ -125,13 +129,14 @@ def adjust_distances(distances, directions, selected_directions, gamma = 1.0):
 ## Hard Cluster Selection on the same clusters as AID ##
 
 
-def hard_cluster_selection(features, queries, select_clusters, k = 200, n_clusters = None, max_clusters = 10):
+def hard_cluster_selection(features, queries, select_clusters, k = 200, n_clusters = None, max_clusters = 10, show_progress = False):
     """ Hard Cluster Selection as used by CLUE, but on the clusters determined by AID (our method). """
     
     # Baseline retrieval
     retrievals = baseline_retrieval(features, queries, select_clusters)
     
-    for qid, (ret, distances) in retrievals.items():
+    ret_it = tqdm(retrievals.items(), desc = 'Hard-Select', total = len(retrievals), leave = False) if show_progress else retrievals.items()
+    for qid, (ret, distances) in ret_it:
         
         query = queries[qid]
         query_feat = features[query['img_id']]

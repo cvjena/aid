@@ -5,12 +5,13 @@ from sklearn.cluster import SpectralClustering
 import heapq
 
 from common import baseline_retrieval
+from utils import tqdm
 
 
 
 ## CLUE ##
 
-def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9):
+def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9, show_progress = False):
     """ CLUE method for cluster-based relevance feedback in image retrieval.
     
     Reference:
@@ -32,6 +33,8 @@ def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9
     
     T - Threshold for the n-cut value. Nodes with an n-cut value larger than this threshold won't be subdivided any further.
     
+    show_progress - If True, a progress bar will be shown (requires tqdm).
+    
     Returns: re-ranked retrieval results as dictionary mapping query IDs to tuples consisting of an ordered list of retrieved image IDs
              and a corresponding list of adjusted distances to the query.
     """
@@ -39,7 +42,8 @@ def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9
     # Baseline retrieval
     retrievals = baseline_retrieval(features, queries, select_clusters)
     
-    for qid, (ret, distances) in retrievals.items():
+    ret_it = tqdm(retrievals.items(), desc = 'CLUE', total = len(retrievals), leave = False) if show_progress else retrievals.items()
+    for qid, (ret, distances) in ret_it:
         
         query = queries[qid]
         query_feat = features[query['img_id']]

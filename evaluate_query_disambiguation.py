@@ -8,7 +8,7 @@ from collections import OrderedDict
 from common import baseline_retrieval
 from aid import automatic_image_disambiguation, hard_cluster_selection
 from clue import clue
-from utils import get_dataset_queries, print_metrics
+from utils import get_dataset_queries, print_metrics, ptqdm
 import eval_metrics
 
 
@@ -102,12 +102,11 @@ if __name__ == '__main__':
     precisions = OrderedDict()
     select_clusters_func = select_clusters_by_precision if args.multiple else select_best_cluster
     select_clusters = lambda query, clusters: select_clusters_func(query, [c[:args.num_preview] for c in clusters])
-    for r in range(args.rounds):
-        sys.stderr.write('Round {}/{}\n'.format(r+1, args.rounds))
+    for r in ptqdm(range(args.rounds), desc = 'Rounds', total = args.rounds):
         for method in args.methods:
             
             params = algo_params[method.lower()] if method.lower() in algo_params else {}
-            retrieved = METHODS[method](features, queries, select_clusters, **params)
+            retrieved = METHODS[method](features, queries, select_clusters, show_progress = True, **params)
             
             if method not in metrics:
                 metrics[method] = []
