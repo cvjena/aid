@@ -11,7 +11,7 @@ from utils import tqdm
 
 ## CLUE ##
 
-def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9, show_progress = False):
+def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9, min_cluster_size = 2, show_progress = False):
     """ CLUE method for cluster-based relevance feedback in image retrieval.
     
     Reference:
@@ -33,6 +33,8 @@ def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9
     
     T - Threshold for the n-cut value. Nodes with an n-cut value larger than this threshold won't be subdivided any further.
     
+    min_cluster_size - Minimum number of items per cluster.
+    
     show_progress - If True, a progress bar will be shown (requires tqdm).
     
     Returns: re-ranked retrieval results as dictionary mapping query IDs to tuples consisting of an ordered list of retrieved image IDs
@@ -49,7 +51,7 @@ def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9
         query_feat = features[query['img_id']]
         
         # Spectral clustering of top results
-        tree = RecursiveNormalizedCuts(max_clusters, T)
+        tree = RecursiveNormalizedCuts(max_clusters, T, min_cluster_size)
         tree.fit([(id, features[id]) for id in ret[:k]])
         clusters = tree.clusters()
         
@@ -74,10 +76,11 @@ def clue(features, queries, select_clusters, k = 200, max_clusters = 10, T = 0.9
 
 class RecursiveNormalizedCuts(object):
     
-    def __init__(self, max_clusters, T):
+    def __init__(self, max_clusters, T, min_cluster_size = 2):
         object.__init__(self)
         self.max_clusters = max_clusters
         self.T = T
+        self.min_cluster_size = min_cluster_size
         self.tree = { 'depth' : 0, 'height' : 0, 'size' : 0, 'leafs' : 1, 'children' : [], 'parent' : None, 'items' : [], 'affinity' : [] }
     
     
@@ -93,7 +96,7 @@ class RecursiveNormalizedCuts(object):
         queue = []
         heapq.heappush(queue, (-1 * len(self.tree['items']), np.random.rand(), self.tree))
         while (self.tree['leafs'] < self.max_clusters) and (len(queue) > 0):
-            if len(queue[0][2]['items']) < 2:
+            if len(queue[0][2]['items']) <= self.min_cluster_size:
                 break
             left, right, ncut_value = self.split(heapq.heappop(queue)[2])
             if ncut_value > self.T:
@@ -106,14 +109,19 @@ class RecursiveNormalizedCuts(object):
     def split(self, node):
         
         # Perform normalized cut
-        ind = SpectralClustering(2, affinity = 'precomputed', assign_labels = 'discretize').fit_predict(node['affinity'])
+        try:
+            ind = SpectralClustering(2, affinity = 'precomputed', assign_labels = 'discretize').fit_predict(node['affinity'])
+        except KeyboardInterrupt:
+            raise
+        except:
+            return None, None, 0
         
         # Create left and right node
         mask1, mask2 = (ind == 0), (ind == 1)
         if not (np.any(mask1) and np.any(mask2)):
             return None, None, 0
-        left = { 'depth' : node['depth'] + 1, 'height' : 0, 'size' : 0, 'leafs' : 1, 'children' : [], 'parent' : node, 'items' : [f for i, f in enumerate(node['items']) if ind[i] == 0], 'affinity' : node['affinity'][mask1,:][:,mask1] }
-        right = { 'depth' : node['depth'] + 1, 'height' : 0, 'size' : 0, 'leafs' : 1, 'children' : [], 'parent' : node, 'items' : [f for i, f in enumerate(node['items']) if ind[i] == 1], 'affinity' : node['affinity'][mask2,:][:,mask2] }
+        left = { 'depth' : node['depth'] + 1, 'height' : 0, 'size' : 0, 'leafs' : 1, 'children' : [], 'parent' : node, 'items' : [f for i, f in enumerate(node['items']) if ind[i] == 0], 'affinity' : node['affinity'][np.ix_(mask1, mask1)] }
+        right = { 'depth' : node['depth'] + 1, 'height' : 0, 'size' : 0, 'leafs' : 1, 'children' : [], 'parent' : node, 'items' : [f for i, f in enumerate(node['items']) if ind[i] == 1], 'affinity' : node['affinity'][np.ix_(mask2, mask2)] }
         
         # Force the node with the lower minimum distance to the query to be the left node
         if ind[0] == 1: # items are already sorted when passed to fit(), so we just need to look at the first item instead of re-computing all distances
