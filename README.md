@@ -10,6 +10,29 @@ to reproduce the results from the corresponding paper:
 If you use AID, please cite that paper.
 
 
+What is AID?
+------------
+
+![aid-schema](https://user-images.githubusercontent.com/7915048/31986052-52dd0688-b967-11e7-84d0-c778aa129f3d.png)
+
+AID is a novel recommendation and re-ranking technique for content-based image retrieval (CBIR).
+Query images presented to a CBIR system are usually ambiguous, so that user feedback is crucial for
+refining the search results towards the actual search objective pursued by the user.
+
+Instead of asking the user to mark multiple relevant and irrelevant images among the initial search
+results one by one, AID automatically discovers different meanings of the query image by clustering
+the top search results and then asks the users to simply select the cluster that seems most relevant
+to them. This way, the user's effort is minimized.
+
+Many similar methods restrict the set of refined results to the selected cluster. However, such an
+approach is sub-optimal, because the final set of results will be a strict subset of the initial
+set used for clustering, though there could be more relevant images not present among the first
+top results. AID; in contrast, applies a global re-ranking of all images in the database with
+respect to both the cluster selected by the user and the similarity to the initial query image.
+
+For details, please refer to the paper mentioned above.
+
+
 Dependencies
 ------------
 
