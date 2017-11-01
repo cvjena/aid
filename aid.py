@@ -3,7 +3,9 @@ import scipy.linalg
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import rbf_kernel
-from sklearn.utils.graph import graph_laplacian
+from scipy.sparse.csgraph import laplacian as graph_laplacian
+
+from multiprocessing import Pool
 
 from common import baseline_retrieval
 from utils import tqdm
@@ -49,34 +51,66 @@ def automatic_image_disambiguation(features, queries, select_clusters, gamma = 1
     retrievals = baseline_retrieval(features, queries, select_clusters)
     
     ret_it = tqdm(retrievals.items(), desc = 'AID', total = len(retrievals), leave = False) if show_progress else retrievals.items()
-    for qid, (ret, distances) in ret_it:
-        
-        query = queries[qid]
-        query_feat = features[query['img_id']]
-        
-        # Compute directions from query to results
-        directions = features[ret] - query_feat[None,:]
-        directions /= np.maximum(np.linalg.norm(directions, axis = -1, keepdims = True), EPS)
-        
-        # Cluster directions of top results
-        nc = n_clusters if (n_clusters is not None) and (n_clusters >= 1) else determine_num_clusters_spectral(directions[:k, :], max_clusters = max_clusters)
-        if nc > 1:
-            km = KMeans(nc, n_init = 100, max_iter = 1000, n_jobs = -1)
-            # The KMeans implementation of sklearn <= 0.18.X suffers from numerical precision errors when using float32,
-            # so we convert the data to float64 for clustering. See: https://github.com/scikit-learn/scikit-learn/issues/7705
-            cluster_ind = km.fit_predict(directions[:k, :].astype(np.float64))
-
-            # Ask user to select relevant clusters
-            cluster_preview = [[id for id, l in zip(ret, cluster_ind) if l == i] for i in range(nc)]
-            selected_clusters = select_clusters(query, cluster_preview)
-
-            # Re-rank results by taking their direction in relation to the selected clusters into account
-            if (len(selected_clusters) > 0) and (len(selected_clusters) < nc):
-                distances = adjust_distances(distances, directions, km.cluster_centers_[selected_clusters, :], gamma)
-                ind = np.argsort(distances)
-                retrievals[qid] = (ret[ind], distances[ind])
     
-    return retrievals
+    with Pool(initializer = _init_pool, initargs = (features, queries, select_clusters, gamma, k, n_clusters, max_clusters)) as p:
+        return dict(p.imap_unordered(_aid_worker, ret_it, 10))
+
+
+def _init_pool(features, queries, select_clusters, gamma, k, n_clusters, max_clusters):
+    global _features
+    global _queries
+    global _select_clusters
+    global _gamma
+    global _k
+    global _n_clusters
+    global _max_clusters
+    _features = features
+    _queries = queries
+    _select_clusters = select_clusters
+    _gamma = gamma
+    _k = k
+    _n_clusters = n_clusters
+    _max_clusters = max_clusters
+
+
+def _aid_worker(args):
+    
+    global _features
+    global _queries
+    global _select_clusters
+    global _gamma
+    global _k
+    global _n_clusters
+    global _max_clusters
+    
+    qid, (ret, distances) = args
+    
+    query = _queries[qid]
+    query_feat = _features[query['img_id']]
+    
+    # Compute directions from query to results
+    directions = _features[ret] - query_feat[None,:]
+    directions /= np.maximum(np.linalg.norm(directions, axis = -1, keepdims = True), EPS)
+    
+    # Cluster directions of top results
+    nc = _n_clusters if (_n_clusters is not None) and (_n_clusters >= 1) else determine_num_clusters_spectral(directions[:_k, :], max_clusters = _max_clusters)
+    if nc > 1:
+        km = KMeans(nc, n_init = 100, max_iter = 1000, n_jobs = 1)
+        # The KMeans implementation of sklearn <= 0.18.X suffers from numerical precision errors when using float32,
+        # so we convert the data to float64 for clustering. See: https://github.com/scikit-learn/scikit-learn/issues/7705
+        cluster_ind = km.fit_predict(directions[:_k, :].astype(np.float64))
+
+        # Ask user to select relevant clusters
+        cluster_preview = [[id for id, l in zip(ret, cluster_ind) if l == i] for i in range(nc)]
+        selected_clusters = _select_clusters(query, cluster_preview)
+
+        # Re-rank results by taking their direction in relation to the selected clusters into account
+        if (len(selected_clusters) > 0) and (len(selected_clusters) < nc):
+            distances = adjust_distances(distances, directions, km.cluster_centers_[selected_clusters, :], _gamma)
+            ind = np.argsort(distances)
+            return (qid, (ret[ind], distances[ind]))
+    
+    return (qid, (ret, distances))
 
 
 def determine_num_clusters_spectral(X, max_clusters = 10, gamma = None):
@@ -136,29 +170,43 @@ def hard_cluster_selection(features, queries, select_clusters, k = 200, n_cluste
     retrievals = baseline_retrieval(features, queries, select_clusters)
     
     ret_it = tqdm(retrievals.items(), desc = 'Hard-Select', total = len(retrievals), leave = False) if show_progress else retrievals.items()
-    for qid, (ret, distances) in ret_it:
-        
-        query = queries[qid]
-        query_feat = features[query['img_id']]
-        
-        # Compute directions from query to results
-        directions = features[ret] - query_feat[None,:]
-        directions /= np.maximum(np.linalg.norm(directions, axis = -1, keepdims = True), EPS)
-        
-        # Cluster directions of top results
-        nc = n_clusters if (n_clusters is not None) and (n_clusters >= 1) else determine_num_clusters_spectral(directions[:k, :], max_clusters = max_clusters)
-        if nc > 1:
-            km = KMeans(nc, n_init = 100, max_iter = 1000, n_jobs = -1)
-            cluster_ind = km.fit_predict(directions[:k, :].astype(np.float64))
-
-            # Ask user to select relevant clusters
-            cluster_preview = [[id for id, l in zip(ret, cluster_ind) if l == i] for i in range(nc)]
-            selected_clusters = select_clusters(query, cluster_preview)
-
-            # Put images from the selected clusters first
-            retrievals[qid] = (
-                np.concatenate(([id for i, id in enumerate(ret[:k]) if cluster_ind[i] in selected_clusters], [id for i, id in enumerate(ret[:k]) if cluster_ind[i] not in selected_clusters], ret[k:])),
-                np.concatenate(([dist for i, dist in enumerate(distances[:k]) if cluster_ind[i] in selected_clusters], [dist for i, dist in enumerate(distances[:k]) if cluster_ind[i] not in selected_clusters], distances[k:]))
-            )
     
-    return retrievals
+    with Pool(initializer = _init_pool, initargs = (features, queries, select_clusters, 1.0, k, n_clusters, max_clusters)) as p:
+        return dict(p.imap_unordered(_hs_worker, ret_it, 10))
+
+
+def _hs_worker(args):
+    
+    global _features
+    global _queries
+    global _select_clusters
+    global _k
+    global _n_clusters
+    global _max_clusters
+    
+    qid, (ret, distances) = args
+    
+    query = _queries[qid]
+    query_feat = _features[query['img_id']]
+    
+    # Compute directions from query to results
+    directions = _features[ret] - query_feat[None,:]
+    directions /= np.maximum(np.linalg.norm(directions, axis = -1, keepdims = True), EPS)
+    
+    # Cluster directions of top results
+    nc = _n_clusters if (_n_clusters is not None) and (_n_clusters >= 1) else determine_num_clusters_spectral(directions[:_k, :], max_clusters = _max_clusters)
+    if nc > 1:
+        km = KMeans(nc, n_init = 100, max_iter = 1000, n_jobs = 1)
+        cluster_ind = km.fit_predict(directions[:_k, :].astype(np.float64))
+
+        # Ask user to select relevant clusters
+        cluster_preview = [[id for id, l in zip(ret, cluster_ind) if l == i] for i in range(nc)]
+        selected_clusters = _select_clusters(query, cluster_preview)
+
+        # Put images from the selected clusters first
+        return (qid, (
+            np.concatenate(([id for i, id in enumerate(ret[:_k]) if cluster_ind[i] in selected_clusters], [id for i, id in enumerate(ret[:_k]) if cluster_ind[i] not in selected_clusters], ret[_k:])),
+            np.concatenate(([dist for i, dist in enumerate(distances[:_k]) if cluster_ind[i] in selected_clusters], [dist for i, dist in enumerate(distances[:_k]) if cluster_ind[i] not in selected_clusters], distances[_k:]))
+        ))
+    
+    return (qid, (ret, distances))
