@@ -53,10 +53,10 @@ if __name__ == '__main__':
     parser_general.add_argument('methods', type = str, nargs = '*', default = list(METHODS.keys()), help = 'Methods to be tested (choices: {}).'.format(', '.join(list(METHODS.keys()))))
     parser_general.add_argument('--num_preview', type = int, default = 10, help = 'Number of images shown to the user for each suggested image sense.')
     parser_general.add_argument('--multiple', action = 'store_const', const = True, default = False, help = 'Allow selection of multiple suggested image senses.')
-    parser_general.add_argument('--rounds', type = int, default = 10, help = 'Number of iterations of the experiment for more robustness against random initializations. Results will be averaged.')
+    parser_general.add_argument('--rounds', type = int, default = 5, help = 'Number of iterations of the experiment for more robustness against random initializations. Results will be averaged.')
     parser_data = parser.add_argument_group('Data')
     parser_data.add_argument('--gt_dir', type = str, default = 'mirflickr', help = 'Directory with the ground-truth label files.')
-    parser_data.add_argument('--query_dir', type = str, default = 'mirflickr', help = 'Directory with the query list files.')
+    parser_data.add_argument('--query_dir', type = str, default = None, help = 'Directory with the query list files.')
     parser_data.add_argument('--dup_file', type = str, default = 'mirflickr/duplicates.txt', help = 'File containing a list of IDs of duplicate images.')
     parser_data.add_argument('--feature_dump', type = str, default = 'features.npy', help = 'Path to a dump of the feature matrix of the dataset as created by extract_features.py.')
     parser_display = parser.add_argument_group('Results Format')
@@ -125,12 +125,6 @@ if __name__ == '__main__':
                         ret,
                         set([queries[qid]['img_id']]) | (queries[qid]['ignore'] if 'ignore' in queries[qid] else set())
                     ) for qid, (ret, dist) in retrieved.items()], axis = 0))
-    
-    import pickle
-    with open('/home/barz/PhD/Evaluation/AID/aid_metrics_{}_k200_gamma1.0.pickle'.format('multi' if args.multiple else 'single'),'wb') as df:
-        pickle.dump(metrics, df)
-    with open('/home/barz/PhD/Evaluation/AID/aid_prec_{}_k200_gamma1.0.pickle'.format('multi' if args.multiple else 'single'),'wb') as df:
-        pickle.dump(precisions, df)
     
     print_metrics(OrderedDict((method, { metric: np.mean([m[metric] for m in lists]) for metric in lists[0].keys() }) for method, lists in metrics.items()), tabular = not args.csv)
     

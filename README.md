@@ -5,7 +5,8 @@ This repository contains the reference implementation of AID and code that can b
 to reproduce the results from the corresponding paper:
 
 > Björn Barz and Joachim Denzler.  
-> "Automatic Query Image Disambiguation for Content-based Image Retrieval."
+> "Automatic Query Image Disambiguation for Content-based Image Retrieval."  
+> International Conference on Computer Vision Theory and Applications (VISAPP), 2018.
 
 If you use AID, please cite that paper.
 
@@ -46,7 +47,7 @@ Dependencies
 ##### Optional
 
 - `caffe` & `pycaffe` (required if you want to extract the image features yourself)
-- `tqdm` (for progress bars during feature extraction)
+- `tqdm` (for progress bars)
 - `matplotlib` (if you would like to generate graphs for Precision@k)
 
 
@@ -72,11 +73,29 @@ the features yourself as follows:
 Once you have downloaded or extracted the features of the dataset images, you can run the benchmark
 as follows:
 
-    python evaluate_query_disambiguation.py --show_sd --plot_precision
+    python evaluate_query_disambiguation.py --plot_precision
 
 See `python evaluate_query_disambiguation.py --help` for the full list of options.
 
 The result should be similar to the following:
+
+                |   AP   |  P@1   |  P@10  |  P@50  | P@100  |  NDCG  | NDCG@100
+    ----------------------------------------------------------------------------
+    Baseline    | 0.4201 | 0.6453 | 0.6191 | 0.5932 | 0.5790 | 0.8693 |   0.5869
+    CLUE        | 0.4221 | 0.8301 | 0.7829 | 0.6466 | 0.5978 | 0.8722 |   0.6306
+    Hard-Select | 0.4231 | 0.8158 | 0.8059 | 0.6771 | 0.6116 | 0.8727 |   0.6451
+    AID         | 0.5188 | 0.8252 | 0.7947 | 0.7454 | 0.7211 | 0.8991 |   0.7350
+
+The baseline results should match exactly, while deviations may occur in the other rows due to
+randomization.
+
+However, running the benchmark on the entire MIRFLICKR-25K dataset might take about a week and lots of RAM.
+If you would like to perform a slightly faster consistency check, you can also run the evaluation on
+a set of 70 pre-defined queries (5 for each topic):
+
+    python evaluate_query_disambiguation.py --query_dir mirflickr --rounds 10 --show_sd --plot_precision
+
+In that case, the results should be similar to:
 
                 |   AP   |  P@1   |  P@10  |  P@50  | P@100  |  NDCG  | NDCG@100
     ----------------------------------------------------------------------------
@@ -94,9 +113,6 @@ The result should be similar to the following:
     CLUE        | 0.0005 | 0.0239 | 0.0074 | 0.0045 | 0.0033 | 0.0003 |   0.0037
     Hard-Select | 0.0006 | 0.0270 | 0.0068 | 0.0072 | 0.0031 | 0.0005 |   0.0039
     AID         | 0.0053 | 0.0203 | 0.0087 | 0.0085 | 0.0088 | 0.0017 |   0.0075
-
-The baseline results should match exactly, while deviations may occur in the other rows due to
-randomization.
 
 
 

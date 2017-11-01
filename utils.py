@@ -38,14 +38,15 @@ def get_dataset_images(img_dir):
     return images
 
 
-def get_dataset_queries(gt_dir, query_dir, dup_file = None):
+def get_dataset_queries(gt_dir, query_dir = None, dup_file = None):
     """ Loads pre-defined queries.
     
     gt_dir - Directory containing ground-truth files, named like "<class>_r1.txt". Each file contains a list of
-             integral image IDs (counting from 1) that belong to the respective class, one ID per line.
+             integer image IDs (counting from 1) that belong to the respective class, one ID per line.
     
     query_dir - Directory containing query files, named like "<class>_query.txt". Each file contains a list of
-                integral image IDs (counting from 1) to be used as query for this class, one query per line.
+                integer image IDs (counting from 1) to be used as query for this class, one query per line.
+                If `None` is given, all images found in the ground-truth list files will be used as queries.
     
     dup_file - Path to a file containing a list of IDs of duplicate images, one list per line. Duplicates of
                the first image on each line will be ignored.
@@ -53,6 +54,11 @@ def get_dataset_queries(gt_dir, query_dir, dup_file = None):
     Returns: a dictionary mapping query IDs to dictionaries with keys 'img_id' and 'relevant'. 'img_id' gives
              the ID of the query image and 'relevant' points to a list of IDs of images relevant for this query.
     """
+    
+    if query_dir is None:
+        query_files = glob(os.path.join(gt_dir, '*_r1.txt'))
+    else:
+        query_files = glob(os.path.join(query_dir, '*_query.txt'))
     
     duplicates = {}
     if dup_file is not None:
@@ -64,8 +70,9 @@ def get_dataset_queries(gt_dir, query_dir, dup_file = None):
                         duplicates[di] = dup_ids[0]
     
     queries = {}
-    for query_file in glob(os.path.join(query_dir, '*_query.txt')):
-        label_file = os.path.join(gt_dir, os.path.basename(query_file)[:-10] + '_r1.txt')
+    for query_file in query_files:
+        topic = os.path.basename(query_file)[:-7] if query_dir is None else os.path.basename(query_file)[:-10]
+        label_file = query_file if query_dir is None else os.path.join(gt_dir, os.path.basename(query_file)[:-10] + '_r1.txt')
         if os.path.exists(label_file):
             
             with open(label_file) as lf:
@@ -75,7 +82,7 @@ def get_dataset_queries(gt_dir, query_dir, dup_file = None):
                 query_imgs = set(duplicates[int(l.strip()) - 1] if (int(l.strip()) - 1) in duplicates else int(l.strip()) - 1 for l in qf if l.strip() != '')
             
             for qid in query_imgs:
-                queries[qid] = { 'img_id' : qid, 'relevant' : relevant, 'ignore' : set(duplicates.keys()) }
+                queries['{}_{}'.format(topic, qid)] = { 'img_id' : qid, 'relevant' : relevant, 'ignore' : set(duplicates.keys()) }
     
     return queries
 
