@@ -5,6 +5,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import rbf_kernel
 from scipy.sparse.csgraph import laplacian as graph_laplacian
 
+import random
 from multiprocessing import Pool
 
 from common import baseline_retrieval
@@ -71,6 +72,8 @@ def _init_pool(features, queries, select_clusters, gamma, k, n_clusters, max_clu
     _k = k
     _n_clusters = n_clusters
     _max_clusters = max_clusters
+    random.seed()
+    np.random.seed()
 
 
 def _aid_worker(args):
