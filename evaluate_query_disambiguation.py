@@ -123,7 +123,7 @@ if __name__ == '__main__':
                     'relevant' : query['relevant'],
                     'retrieved' : retrieved[qid][0],
                     'ignore' : set([query['img_id']]) | (query['ignore'] if 'ignore' in query else set())
-                } for qid, query in queries.items() }, include_prec = False))
+                } for qid, query in queries.items() }))
             for pk in (1, 10, 50, 100):
                 metrics[method][-1]['P@{}'.format(pk)] = precisions[method][-1][pk - 1]
     
