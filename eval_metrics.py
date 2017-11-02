@@ -1,8 +1,9 @@
-import math
+import math, os
+from multiprocessing import Pool
 
 
 
-def query_metrics(relevant, retrieved, ignore = []):
+def query_metrics(relevant, retrieved, ignore = [], include_prec = True):
     """ Computes several performance metrics for the result of a single query.
     
     relevant - Ground-Truth: Set of IDs relevant to the query.
@@ -10,6 +11,8 @@ def query_metrics(relevant, retrieved, ignore = []):
     ret - Ranked list of retrieved image identifiers.
     
     ignore - Optionally, a set of IDs to be ignored, i.e., to be counted neither as true nor as false positive.
+    
+    include_prec - If `True`, P@1, P@10, P@50, and P@100 will be included in the resulting performance metrics.
     
     Returns: dictionary with the following items:
             - 'AP' : average precision
@@ -21,14 +24,48 @@ def query_metrics(relevant, retrieved, ignore = []):
             - 'NDCG@100' : normalized discounted cumulative gain over the top 100 results
     """
     
+    if include_prec:
+        
+        return {
+            'AP' : average_precision(relevant, retrieved, ignore),
+            'P@1' : precision_at_k(1, relevant, retrieved, ignore),
+            'P@10' : precision_at_k(10, relevant, retrieved, ignore),
+            'P@50' : precision_at_k(50, relevant, retrieved, ignore),
+            'P@100' : precision_at_k(100, relevant, retrieved, ignore),
+            'NDCG' : ndcg(relevant, retrieved, ignore),
+            'NDCG@100' : ndcg(relevant, retrieved, ignore, 100),
+        }
+        
+    else:
+        
+        return {
+            'AP' : average_precision(relevant, retrieved, ignore),
+            'NDCG' : ndcg(relevant, retrieved, ignore),
+            'NDCG@100' : ndcg(relevant, retrieved, ignore, 100),
+        }
+
+
+
+def query_metrics_dict(query):
+    """ Computes several performance metrics for the result of a single query, given as dictionary.
+    
+    query - Dictionary with keys 'relevant' (a set of relevant image IDs) and 'retrieved' (a list of retrieved image IDs).
+            In addition, the dictionary may also contain an item named 'ignore', which gives a set of
+            image IDs to be ignored, i.e., to be considered neither a true nor a false positive.
+    
+    Returns: dictionary with the following items:
+            - 'AP' : average precision
+            - 'NDCG' : normalized discounted cumulative gain over the entire list of results
+            - 'NDCG@100' : normalized discounted cumulative gain over the top 100 results
+    """
+    
+    if 'ignore' not in query:
+        query['ignore'] = []
+    
     return {
-        'AP' : average_precision(relevant, retrieved, ignore),
-        'P@1' : precision_at_k(1, relevant, retrieved, ignore),
-        'P@10' : precision_at_k(10, relevant, retrieved, ignore),
-        'P@50' : precision_at_k(50, relevant, retrieved, ignore),
-        'P@100' : precision_at_k(100, relevant, retrieved, ignore),
-        'NDCG' : ndcg(relevant, retrieved, ignore),
-        'NDCG@100' : ndcg(relevant, retrieved, ignore, 100),
+        'AP' : average_precision(query['relevant'], query['retrieved'], query['ignore']),
+        'NDCG' : ndcg(query['relevant'], query['retrieved'], query['ignore']),
+        'NDCG@100' : ndcg(query['relevant'], query['retrieved'], query['ignore'], 100),
     }
 
 
@@ -41,28 +78,23 @@ def avg_query_metrics(queries):
               In addition, the dictionaries may also contain an item named 'ignore', which gives a set of
               image IDs to be ignored, i.e., to be considered neither a true nor a false positive.
     
-    Returns: tuple with 2 items:
-        1. dictionary with averages of the performance metrics described at `query_metrics`
-        2. dictionary mapping metric names to dictionaries mapping query IDs to values
+    Returns: dictionary with averages of the performance metrics described at `query_metrics_dict`
     """
     
-    individual, sums = dict(), dict()
+    sums = dict()
     
-    for qid, query in queries.items():
-        single = query_metrics(query['relevant'], query['retrieved'], query['ignore'] if 'ignore' in query else [])
-        for metric, value in single.items():
-            if metric not in individual:
-                individual[metric] = dict()
-            individual[metric][qid] = value
-            if metric not in sums:
-                sums[metric] = value
-            else:
-                sums[metric] += value
+    with Pool() as p:
+        for single in p.imap_unordered(query_metrics_dict, queries.values(), 100):
+            for metric, value in single.items():
+                if metric not in sums:
+                    sums[metric] = value
+                else:
+                    sums[metric] += value
     
     for metric, value in sums.items():
         sums[metric] = value / float(len(queries))
     
-    return sums, individual
+    return sums
 
 
 

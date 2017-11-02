@@ -4,6 +4,7 @@ import sys
 import argparse
 import itertools
 from collections import OrderedDict
+from multiprocessing import Pool
 
 from common import baseline_retrieval
 from aid import automatic_image_disambiguation, hard_cluster_selection
@@ -108,23 +109,23 @@ if __name__ == '__main__':
             params = algo_params[method.lower()] if method.lower() in algo_params else {}
             retrieved = METHODS[method](features, queries, select_clusters, show_progress = True, **params)
             
+            if method not in precisions:
+                precisions[method] = []
+            with Pool() as p:
+                precisions[method].append(np.mean(list(p.starmap(
+                    eval_metrics.precision_at_k,
+                    ((range(1, 101), queries[qid]['relevant'], ret, set([queries[qid]['img_id']]) | (queries[qid]['ignore'] if 'ignore' in queries[qid] else set())) for qid, (ret, dist) in retrieved.items())
+                )), axis = 0))
+            
             if method not in metrics:
                 metrics[method] = []
             metrics[method].append(eval_metrics.avg_query_metrics({ qid : {
-                'relevant' : query['relevant'],
-                'retrieved' : retrieved[qid][0],
-                'ignore' : set([query['img_id']]) | (query['ignore'] if 'ignore' in query else set())
-            } for qid, query in queries.items() })[0])
-            
-            if args.plot_precision:
-                if method not in precisions:
-                    precisions[method] = []
-                precisions[method].append(np.mean([eval_metrics.precision_at_k(
-                        range(1, 101),
-                        queries[qid]['relevant'],
-                        ret,
-                        set([queries[qid]['img_id']]) | (queries[qid]['ignore'] if 'ignore' in queries[qid] else set())
-                    ) for qid, (ret, dist) in retrieved.items()], axis = 0))
+                    'relevant' : query['relevant'],
+                    'retrieved' : retrieved[qid][0],
+                    'ignore' : set([query['img_id']]) | (query['ignore'] if 'ignore' in query else set())
+                } for qid, query in queries.items() }, include_prec = False))
+            for pk in (1, 10, 50, 100):
+                metrics[method][-1]['P@{}'.format(pk)] = precisions[method][-1][pk - 1]
     
     print_metrics(OrderedDict((method, { metric: np.mean([m[metric] for m in lists]) for metric in lists[0].keys() }) for method, lists in metrics.items()), tabular = not args.csv)
     
