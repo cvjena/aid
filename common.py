@@ -1,4 +1,5 @@
 import numpy as np
+from multiprocessing import Pool
 from utils import tqdm
 
 
@@ -20,11 +21,21 @@ def baseline_retrieval(features, queries, select_clusters, show_progress = False
     """
     
     # Build ranked list of retrieval results for each query
-    retrievals = {}
-    query_it = tqdm(queries.items(), desc = 'Baseline', total = len(queries), leave = False) if show_progress else queries.items()
-    for qid, query in query_it:
-        distances = np.sum((features - features[[query['img_id']],:]) ** 2, axis = 1)
-        ranking = np.argsort(distances)
-        assert(ranking[0] == query['img_id'])
-        retrievals[qid] = (ranking[1:], distances[ranking[1:]])
-    return retrievals
+    query_it = tqdm(queries.keys(), desc = 'Baseline', total = len(queries), leave = False) if show_progress else queries.keys()
+    with Pool(initializer = _init_pool, initargs = (features, { qid : query['img_id'] for qid, query in queries.items() })) as p:
+        return dict(p.imap_unordered(_retrieval_worker, query_it, 100))
+
+
+def _init_pool(features, query_img_ids):
+    global _feat
+    global _img_ids
+    _feat = features
+    _img_ids = query_img_ids
+
+def _retrieval_worker(qid):
+    global _feat
+    global _img_ids
+    distances = np.sum((_feat - _feat[[_img_ids[qid]],:]) ** 2, axis = 1)
+    ranking = np.argsort(distances)
+    assert(ranking[0] == _img_ids[qid])
+    return (qid, (ranking[1:], distances[ranking[1:]]))
