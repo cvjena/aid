@@ -2,7 +2,7 @@ Automatic Query Image Disambiguation (AID)
 ==========================================
 
 This repository contains the reference implementation of AID and code that can be used
-to reproduce the results from the corresponding paper:
+to reproduce the results from the corresponding [paper][4]:
 
 > Björn Barz and Joachim Denzler.  
 > "Automatic Query Image Disambiguation for Content-based Image Retrieval."  
@@ -119,3 +119,4 @@ In that case, the results should be similar to:
 [1]: http://www.inf-cv.uni-jena.de/dbvmedia/de/Barz/AID/features.npy
 [2]: http://press.liacs.nl/mirflickr/mirflickr25k/mirflickr25k.zip
 [3]: http://www.robots.ox.ac.uk/%7Evgg/software/very_deep/caffe/VGG_ILSVRC_16_layers.caffemodel
+[4]: http://hera.inf-cv.uni-jena.de:6680/pdf/Barz18:AID.pdf
